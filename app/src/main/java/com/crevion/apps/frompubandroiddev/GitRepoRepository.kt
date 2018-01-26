@@ -1,37 +1,27 @@
 package com.crevion.apps.frompubandroiddev
 
+import io.reactivex.Observable
+
 
 /**
  * Created by yusufaw on 1/26/18.
  */
 
-class GitRepoRepository(val netManager: NetManager) {
+class GitRepoRepository(private val netManager: NetManager) {
 
-    val localDataSource = GitRepoLocalDataSource()
-    val remoteDataSource = GitRepoRemoteDataSource()
+    private val localDataSource = GitRepoLocalDataSource()
+    private val remoteDataSource = GitRepoRemoteDataSource()
 
-    fun getRepositories(onRepositoryReadyCallback: OnRepositoryReadyCallback) {
+    fun getRepositories(): Observable<ArrayList<Repository>> {
         netManager.isConnectedToInternet?.let {
             if(it) {
-                remoteDataSource.getRepositories(object : OnRepoRemoteReadyCallback {
-                    override fun onRemoteDataReady(data: ArrayList<Repository>) {
-                        localDataSource.saveRepositories(data)
-                        onRepositoryReadyCallback.onDataReady(data)
-                    }
-
-                })
-            } else {
-                localDataSource.getRepositories(object : OnRepoLocalReadyCallback {
-                    override fun onLocalDataReady(data: ArrayList<Repository>) {
-                        onRepositoryReadyCallback.onDataReady(data)
-                    }
-                })
+                return remoteDataSource.getRepositories().flatMap {
+                    return@flatMap localDataSource.saveRepositories(it)
+                            .toSingleDefault(it)
+                            .toObservable()
+                }
             }
         }
-
+        return localDataSource.getRepositories()
     }
-}
-
-interface OnRepositoryReadyCallback {
-    fun onDataReady(data: ArrayList<Repository>)
 }
